@@ -1,7 +1,7 @@
 const nodemailer = require("nodemailer");
 const mongoose = require("mongoose");
 const Teacher = require("./models/teacherSchema");
-const Attendance = require("./models/attendance")
+const Attendance = require("./models/attendance");
 const studentQuery = require("./models/userQuery");
 const bcrypt = require("bcryptjs");
 const NgrokUrl = require("./models/ngrok_url");
@@ -37,14 +37,14 @@ const transporter = nodemailer.createTransport({
 
 //set mail id and otp to send the email to
 const mailOptions = (email, otp, mailType) => {
-  if(mailType === 1) {
+  if (mailType === 1) {
     return {
       from: process.env.SENDER_MAIL_ID,
       to: email,
       subject: "OTP verification for Attendance Management System sign up",
       text: `Your OTP for email verification is: ${otp}`,
     };
-  } else if(mailType === 2) {
+  } else if (mailType === 2) {
     //send notification that you were absent for course
   }
 };
@@ -71,7 +71,7 @@ const userSignup = async (req, res) => {
       //take user email from request
       const { email } = req.body;
 
-      const foundEmail = await Teacher.findOne({ email })
+      const foundEmail = await Teacher.findOne({ email });
 
       //if email found ask them to login instead
       if (foundEmail != undefined || foundEmail != null) {
@@ -123,46 +123,46 @@ const userSignup = async (req, res) => {
   }
 
   //save credentials once email verified
-else {
-      const { email, name, password, course } = req.body;
-      const hashedPassword = await bcrypt.hash(password, 10);
-      console.log("details are", email, course)
-      const newUser = new Teacher({
-        email,
-        name,
-        course,
-        password: hashedPassword,
-      });
+  else {
+    const { email, name, password, course } = req.body;
+    const hashedPassword = await bcrypt.hash(password, 10);
+    console.log("details are", email, course);
+    const newUser = new Teacher({
+      email,
+      name,
+      course,
+      password: hashedPassword,
+    });
 
-      const response = await newUser.save();
-      console.log("reesponse for saving user is ", response);
-      res.json({
-        message:
-          "crendentials stored successfully, enjoy food within your budget",
-        key: 1,
-      });
-    }
+    const response = await newUser.save();
+    console.log("reesponse for saving user is ", response);
+    res.json({
+      message:
+        "crendentials stored successfully, enjoy food within your budget",
+      key: 1,
+    });
   }
+};
 
 const userLogin = async (req, res) => {
   const { email, password } = req.body;
-    const user = await Teacher.findOne({ email });
-    console.log("user is", email, password);
+  const user = await Teacher.findOne({ email });
+  console.log("user is", email, password);
 
-    if (user == null || user == undefined) {
-      console.log("not found babe");
-      return res.json({ message: "user not found, please signup", key: 0 });
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-
-    if (isMatch) {
-      console.log("at login succesful");
-      res.json({ message: "Login successful", key: 1 });
-    } else {
-      return res.json({ message: "wrong password, try again", key: 0 });
-    }
+  if (user == null || user == undefined) {
+    console.log("not found babe");
+    return res.json({ message: "user not found, please signup", key: 0 });
   }
+
+  const isMatch = await bcrypt.compare(password, user.password);
+
+  if (isMatch) {
+    console.log("at login succesful");
+    res.json({ message: "Login successful", key: 1 });
+  } else {
+    return res.json({ message: "wrong password, try again", key: 0 });
+  }
+};
 
 const userForgetPassword = async (req, res) => {
   const { email, newPassword, isStaff } = req.body;
@@ -234,41 +234,85 @@ const handleStudentQuery = async (req, res) => {
   }
 };
 
+const handleAdminAddFaculty = async (req, res) => {
+  try {
+    const { admin, email, name } = req.body;
+    if (admin === process.env.ADMIN) {
+      const newFaculty = new Teacher({
+        email,
+        name,
+      });
+      await newFaculty.save();
+      res.json({ message: "faculty added successfully", key: 1 });
+    } else return res.json({ message: "access denied", key: 0 });
+  } catch (error) {}
+};
+
 const handleAddFacultyCourse = async (req, res) => {
-  const { email, course_details } = req.body;
+  const { admin, email, course_details } = req.body;
 
   try {
-    const response = await Teacher.findOne({ email });
-    if (response) {
-      console.log("type of teacher is, inside adding courses", response, email);
-      const newCourseDetails = [...response.course_details || [], course_details];
-      const courseResponse = await Teacher.findOneAndUpdate(
-        { email },
-        { course_details: newCourseDetails },
-        { new: true }
-      ); // i want course details feild to be updated to newCourseDetails
-      if (courseResponse) {
-        res.json({
-          message: `successfully added course ${course_details.course}`,
-          key: 1,
-        });
+    if (admin === process.env.ADMIN) {
+      const response = await Teacher.findOne({ email });
+      if (response) {
+        console.log(
+          "type of teacher is, inside adding courses",
+          response,
+          email
+        );
+        const newCourseDetails = [
+          ...(response.course_details || []),
+          course_details,
+        ];
+        const courseResponse = await Teacher.findOneAndUpdate(
+          { email },
+          { course_details: newCourseDetails },
+          { new: true }
+        ); // i want course details feild to be updated to newCourseDetails
+        if (courseResponse) {
+          res.json({
+            message: `successfully added course ${course_details.course}`,
+            key: 1,
+          });
+        } else {
+          res.json({
+            message: "unable to update course, try again later",
+            key: 0,
+          });
+        }
       } else {
-        res.json({
-          message: "unable to update course, try again later",
-          key: 0,
-        });
+        res.json({ message: "unable to find user", key: 0 });
       }
-    } else {
-      res.json({ message: "unable to find user", key: 0 });
-    }
+    } else return res.json({ message: "access denied", key: 0 });
   } catch (error) {
     console.error("Error updating course details:", error);
+    res.status(500).json({
+      message: "An error occurred while updating course details",
+      key: 0,
+    });
+  }
+};
+
+const handleFetchFacultyForAdmin = async (req, res) => {
+  try {
+    const { admin } = req.query;
+    if (admin === process.env.ADMIN) {
+      const response = await Teacher.find();
+      if (response) {
+        res.json({
+          message: "Faculty fetched successfully",
+          key: 1,
+          faculty: response,
+        });
+      } else {
+        res.json({ message: "No faculty found", key: 0 });
+      }
+    } else return res.json({ message: "access denied", key: 0 });
+  } catch (error) {
+    console.error("Error fetching faculty:", error);
     res
       .status(500)
-      .json({
-        message: "An error occurred while updating course details",
-        key: 0,
-      });
+      .json({ message: "An error occurred while fetching faculty", key: 0 });
   }
 };
 
@@ -284,10 +328,17 @@ const handleFetchFacultyCourses = async (req, res) => {
         // Extract and send the course details
         console.log("course details are", response);
         const course_details = response.course_details;
-        res.json({ message: "Course details fetched successfully", key: 1, course_details });
+        res.json({
+          message: "Course details fetched successfully",
+          key: 1,
+          course_details,
+        });
       } else {
         // Handle case where no teacher is found with the given email
-        res.json({ message: "No teacher found with the provided email", key: 0 });
+        res.json({
+          message: "No teacher found with the provided email",
+          key: 0,
+        });
       }
     } else {
       // Handle case where the email is missing in the query
@@ -295,19 +346,26 @@ const handleFetchFacultyCourses = async (req, res) => {
     }
   } catch (error) {
     console.error("Error fetching course details:", error);
-    res.status(500).json({ message: "An error occurred while fetching course details", key: 0 });
+    res.status(500).json({
+      message: "An error occurred while fetching course details",
+      key: 0,
+    });
   }
 };
 
-const fetchServerString = async(req, res) => {
-  const {email} = req.query;
+const fetchServerString = async (req, res) => {
+  const { email } = req.query;
 
-  const user = await Teacher.findOne({email});
-  if(user) {
+  const user = await Teacher.findOne({ email });
+  if (user) {
     const response = await NgrokUrl.findOne();
-    res.json({message:"succesfully fetched url", url:response.ngrok_url, key:1}) 
+    res.json({
+      message: "succesfully fetched url",
+      url: response.ngrok_url,
+      key: 1,
+    });
   }
-}
+};
 
 const storeServerString = async (req, res) => {
   try {
@@ -315,7 +373,9 @@ const storeServerString = async (req, res) => {
 
     // Validate request data
     if (!ngrok_url || !naunce) {
-      return res.status(400).json({ message: "Missing required fields", key: 0 });
+      return res
+        .status(400)
+        .json({ message: "Missing required fields", key: 0 });
     }
 
     // Validate the provided naunce with the environment variable
@@ -327,17 +387,23 @@ const storeServerString = async (req, res) => {
         { upsert: true, new: true }
       );
 
-      return res.status(201).json({ message: "Successfully stored the server URL", key: 1 });
+      return res
+        .status(201)
+        .json({ message: "Successfully stored the server URL", key: 1 });
     }
 
     // If naunce does not match
-    return res.status(403).json({ message: "Unauthorized to change the server string", key: 0 });
+    return res
+      .status(403)
+      .json({ message: "Unauthorized to change the server string", key: 0 });
   } catch (error) {
     console.error("Error storing server string:", error);
 
     // Handle different error types accordingly
-    if (error.name === 'ValidationError') {
-      return res.status(400).json({ message: "Validation error: " + error.message, key: 0 });
+    if (error.name === "ValidationError") {
+      return res
+        .status(400)
+        .json({ message: "Validation error: " + error.message, key: 0 });
     }
 
     // General error response
@@ -350,132 +416,164 @@ const addBatch = async (req, res) => {
     const { batchName, students, courseId, email } = req.body;
 
     // Map the students array to match the expected schema
-    const studentObjects = students.map(usn => ({ usn }));
+    const studentObjects = students.map((usn) => ({ usn }));
 
     // First, add or update the batch
     const addBatchResult = await Teacher.findOneAndUpdate(
-      { email, 'course_details.id': courseId, 'course_details.batches.batchName': { $ne: batchName } },
       {
-        $addToSet: {
-          'course_details.$[course].batches': { batchName, students: [] }
-        }
+        email,
+        "course_details.id": courseId,
+        "course_details.batches.batchName": { $ne: batchName },
       },
       {
-        arrayFilters: [{ 'course.id': courseId }],
+        $addToSet: {
+          "course_details.$[course].batches": { batchName, students: [] },
+        },
+      },
+      {
+        arrayFilters: [{ "course.id": courseId }],
         new: true,
-        upsert: true
+        upsert: true,
       }
     );
 
     // Then, update the students array within the batch
     const updateStudentsResult = await Teacher.findOneAndUpdate(
-      { email, 'course_details.id': courseId, 'course_details.batches.batchName': batchName },
+      {
+        email,
+        "course_details.id": courseId,
+        "course_details.batches.batchName": batchName,
+      },
       {
         $set: {
-          'course_details.$[course].batches.$[batch].students': studentObjects
-        }
+          "course_details.$[course].batches.$[batch].students": studentObjects,
+        },
       },
       {
         arrayFilters: [
-          { 'course.id': courseId },
-          { 'batch.batchName': batchName }
+          { "course.id": courseId },
+          { "batch.batchName": batchName },
         ],
-        new: true
+        new: true,
       }
     );
 
     if (!addBatchResult || !updateStudentsResult) {
-      return res.status(404).json({ key: 0, message: 'Teacher or Course not found' });
+      return res
+        .status(404)
+        .json({ key: 0, message: "Teacher or Course not found" });
     }
 
-    res.json({ key: 1, message: 'Batch added/updated successfully' });
+    res.json({ key: 1, message: "Batch added/updated successfully" });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ key: 0, message: 'Server error' });
+    res.status(500).json({ key: 0, message: "Server error" });
   }
 };
 
 const handleUpdateAttendance = async (req, res) => {
   const { email, students, batchName, courseId } = req.body;
 
-  if(batchName === undefined || !batchName || typeof(batchName) === 'undefined') {
+  if (
+    batchName === undefined ||
+    !batchName ||
+    typeof batchName === "undefined"
+  ) {
     try {
       // Find the user by email
       const findUser = await Attendance.findOne({ email, courseId });
-  
+
       if (findUser) {
         // User exists, update their attendance
         const newAttendance = {
           date: new Date(), // Record the current date
           students, // Ensure each student has a usn field
-          note: "no note for now"
+          note: "no note for now",
         };
-  
+
         // Push the new attendance record to the existing attendance array
         findUser.attendance.push(newAttendance);
-  
+
         // Save the updated document
         await findUser.save();
-  
-        res.status(200).json({ message: 'Attendance updated successfully.', key:1 });
+
+        res
+          .status(200)
+          .json({ message: "Attendance updated successfully.", key: 1 });
       } else {
         // User does not exist, create a new record
         const newAttendanceRecord = new Attendance({
           email,
           courseId,
-          attendance: [{
-            date: new Date(),
-            students,
-            note: "no note for now"
-          }]
+          attendance: [
+            {
+              date: new Date(),
+              students,
+              note: "no note for now",
+            },
+          ],
         });
-  
+
         await newAttendanceRecord.save();
-        res.status(201).json({ message: 'New attendance record created successfully.', key:1 });
+        res.status(201).json({
+          message: "New attendance record created successfully.",
+          key: 1,
+        });
       }
     } catch (error) {
-      console.error('Error updating attendance:', error);
-      res.status(500).json({ message: 'Server error. Please try again later.' , key:0});
-    } 
+      console.error("Error updating attendance:", error);
+      res
+        .status(500)
+        .json({ message: "Server error. Please try again later.", key: 0 });
+    }
   } else {
     try {
       // Find the user by email
       const findUser = await Attendance.findOne({ email, courseId });
-  
+
       if (findUser) {
         // User exists, update their attendance
         const newAttendance = {
           date: new Date(), // Record the current date
           students, // Ensure each student has a usn field
-          note: batchName
+          note: batchName,
         };
-  
+
         // Push the new attendance record to the existing attendance array
         findUser.attendance.push(newAttendance);
-  
+
         // Save the updated document
         await findUser.save();
-  
-        res.status(200).json({ message: 'Attendance updated successfully.', key:1 });
+
+        res
+          .status(200)
+          .json({ message: "Attendance updated successfully.", key: 1 });
       } else {
         // User does not exist, create a new record
         const newAttendanceRecord = new Attendance({
           email,
           courseId,
-          attendance: [{
-            date: new Date(),
-            students,
-            note: batchName
-          }]
+          attendance: [
+            {
+              date: new Date(),
+              students,
+              note: batchName,
+            },
+          ],
         });
-  
+
         await newAttendanceRecord.save();
-        res.status(201).json({ message: 'New attendance record created successfully.', key:1 });
+        res.status(201).json({
+          message: "New attendance record created successfully.",
+          key: 1,
+        });
       }
     } catch (error) {
-      console.error('Error updating attendance:', error);
-      res.status(500).json({ message: 'Server error. Please try again later.' , key:0});
-    } 
+      console.error("Error updating attendance:", error);
+      res
+        .status(500)
+        .json({ message: "Server error. Please try again later.", key: 0 });
+    }
   }
 };
 
@@ -488,46 +586,48 @@ const handleViewAttendance = async (req, res) => {
 
     if (attendanceRecord) {
       // Filter attendance records based on the isLab flag
-      const filteredAttendance = attendanceRecord.attendance.filter((record) => {
-        if (isLab === 'true') {
-          // For lab attendance, filter out records with note 'no note for now'
-          return record.note !== 'no note for now';
-        } else {
-          // For class attendance, only include records with note 'no note for now'
-          return record.note === 'no note for now';
+      const filteredAttendance = attendanceRecord.attendance.filter(
+        (record) => {
+          if (isLab === "true") {
+            // For lab attendance, filter out records with note 'no note for now'
+            return record.note !== "no note for now";
+          } else {
+            // For class attendance, only include records with note 'no note for now'
+            return record.note === "no note for now";
+          }
         }
-      });
+      );
 
       // Return the filtered attendance records with key: 1
       res.json({
-        message: 'Attendance records found.',
+        message: "Attendance records found.",
         attendance: filteredAttendance,
         key: 1,
       });
     } else {
       // If no record is found, return key: 0
       res.json({
-        message: 'No attendance record found for this course id ',
+        message: "No attendance record found for this course id ",
         key: 0,
       });
     }
   } catch (error) {
-    console.error('Error retrieving attendance:', error);
+    console.error("Error retrieving attendance:", error);
     // Return key: 0 for server error
     res.json({
-      message: 'Server error. Please try again later.',
+      message: "Server error. Please try again later.",
       key: 0,
     });
   }
 };
 
 const handleViewStudentAttendance = async (req, res) => {
-  const {email} = req.body;
+  const { email } = req.body;
 
   const response = await Attendance.find();
   console.log("attendance data is ", response);
-  res.json({message:"attendance fetched successfully", response});
-}
+  res.json({ message: "attendance fetched successfully", response });
+};
 
 module.exports = {
   userSignup,
@@ -542,4 +642,6 @@ module.exports = {
   handleViewAttendance,
   addBatch,
   handleViewStudentAttendance,
+  handleAdminAddFaculty,
+  handleFetchFacultyForAdmin,
 };

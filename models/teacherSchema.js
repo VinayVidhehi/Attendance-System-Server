@@ -21,7 +21,7 @@ const courseDetailsSchema = new mongoose.Schema({
 const teacherSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
+  password: { type: String },
   course_details: { type: [courseDetailsSchema], default: undefined },  // Makes course_details optional
 });
 
