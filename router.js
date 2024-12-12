@@ -354,16 +354,25 @@ const handleFetchFacultyCourses = async (req, res) => {
 };
 
 const fetchServerString = async (req, res) => {
-  const { email } = req.query;
+  const { email, key } = req.query;
 
-  const user = await Teacher.findOne({ email });
-  if (user) {
+  if (email) {
+    const user = await Teacher.findOne({ email });
+    if (user) {
+      const response = await NgrokUrl.findOne();
+      res.json({
+        message: "succesfully fetched url",
+        url: response.ngrok_url,
+        key: 1,
+      });
+    }
+  } else if(key == "test") {
     const response = await NgrokUrl.findOne();
-    res.json({
-      message: "succesfully fetched url",
-      url: response.ngrok_url,
-      key: 1,
-    });
+      res.json({
+        message: "succesfully fetched url",
+        url: response.ngrok_url,
+        key: 1,
+      });
   }
 };
 
