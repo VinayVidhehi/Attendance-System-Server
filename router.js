@@ -5,6 +5,7 @@ const Attendance = require("./models/attendance");
 const studentQuery = require("./models/userQuery");
 const bcrypt = require("bcryptjs");
 const NgrokUrl = require("./models/ngrok_url");
+const StudentPredictionError = require("./models/studentUsns");
 require("dotenv").config();
 
 let array = [];
@@ -638,6 +639,63 @@ const handleViewStudentAttendance = async (req, res) => {
   res.json({ message: "attendance fetched successfully", response });
 };
 
+const storeAccuracyLevels = async (req, res) => {
+  const { predictedStudents, unmatchedStudents } = req.body;
+
+  try {
+    // Iterate over predictedStudents and unmatchedStudents arrays to update accuracy
+    for (let i = 0; i < predictedStudents.length; i++) {
+      const predictedUsn = predictedStudents[i];
+      const unmatchedUsn = unmatchedStudents[i];
+
+      // For each predicted student, update or create an entry in the database
+      await Promise.all([
+        updateAccuracy(predictedUsn, true),  // Correct prediction
+        updateAccuracy(unmatchedUsn, false)  // Incorrect prediction
+      ]);
+    }
+
+    res.status(200).json({ message: 'Accuracy levels stored successfully' });
+  } catch (error) {
+    console.error('Error storing accuracy levels:', error);
+    res.status(500).json({ error: 'Failed to store accuracy levels' });
+  }
+};
+
+// Helper function to update accuracy for a student
+const updateAccuracy = async (usn, isCorrectPrediction) => {
+  try {
+    // Find the student by USN
+    const student = await StudentPredictionError.findOne({ usn });
+
+    if (student) {
+      // If student exists, update the accuracy and tests count
+      student.tests += 1; // Increment the number of tests
+      student.accuracy = calculateAccuracy(student.tests, isCorrectPrediction, student.accuracy);
+
+      await student.save(); // Save the updated student data
+    } else {
+      // If student doesn't exist, create a new record with the initial test count
+      const newStudent = new StudentPredictionError({
+        usn,
+        accuracy: isCorrectPrediction ? 1 : 0, // Accuracy will be 1 for correct prediction, 0 for incorrect
+        tests: 1, // First test
+      });
+
+      await newStudent.save(); // Save the new student data
+    }
+  } catch (error) {
+    console.error(`Error updating accuracy for USN ${usn}:`, error);
+  }
+};
+
+// Function to calculate updated accuracy based on the number of tests and whether the prediction was correct
+const calculateAccuracy = (totalTests, isCorrectPrediction, previousAccuracy) => {
+  const correctPredictions = isCorrectPrediction ? previousAccuracy * totalTests + 1 : previousAccuracy * totalTests;
+  return correctPredictions / totalTests;
+};
+
+
 module.exports = {
   userSignup,
   userLogin,
@@ -653,4 +711,5 @@ module.exports = {
   handleViewStudentAttendance,
   handleAdminAddFaculty,
   handleFetchFacultyForAdmin,
+  storeAccuracyLevels
 };
