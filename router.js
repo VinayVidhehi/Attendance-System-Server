@@ -670,7 +670,6 @@ const updateAccuracy = async (usn, isCorrectPrediction) => {
 
     if (student) {
       // If student exists, update the accuracy and tests count
-      student.tests += 1; // Increment the number of tests
       student.accuracy = calculateAccuracy(student.tests, isCorrectPrediction, student.accuracy);
 
       await student.save(); // Save the updated student data
@@ -692,7 +691,7 @@ const updateAccuracy = async (usn, isCorrectPrediction) => {
 // Function to calculate updated accuracy based on the number of tests and whether the prediction was correct
 const calculateAccuracy = (totalTests, isCorrectPrediction, previousAccuracy) => {
   const correctPredictions = isCorrectPrediction ? previousAccuracy * totalTests + 1 : previousAccuracy * totalTests;
-  return correctPredictions / totalTests;
+  return correctPredictions / (totalTests+1);
 };
 
 
