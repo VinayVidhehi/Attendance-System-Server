@@ -692,7 +692,7 @@ const updateAccuracy = async (usn, isCorrectPrediction) => {
 // Function to calculate updated accuracy based on the number of tests and whether the prediction was correct
 const calculateAccuracy = (totalTests, isCorrectPrediction, previousAccuracy) => {
   const correctPredictions = isCorrectPrediction ? (previousAccuracy * totalTests) + 1 : previousAccuracy * totalTests;
-  return correctPredictions / (totalTests+1);
+  return correctPredictions / (totalTests + 1);
 };
 
 
