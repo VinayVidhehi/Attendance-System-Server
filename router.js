@@ -6,6 +6,7 @@ const studentQuery = require("./models/userQuery");
 const bcrypt = require("bcryptjs");
 const NgrokUrl = require("./models/ngrok_url");
 const StudentPredictionError = require("./models/studentUsns");
+const StreamPredictedAttendance = require("./models/stream_attendance");
 require("dotenv").config();
 
 let array = [];
@@ -493,6 +494,10 @@ const handleUpdateAttendance = async (req, res) => {
       // Find the user by email
       const findUser = await Attendance.findOne({ email, courseId });
 
+
+      //delete live streamed students data from collection
+      await StreamPredictedAttendance.deleteMany({note: courseId});
+
       if (findUser) {
         // User exists, update their attendance
         const newAttendance = {
@@ -535,7 +540,7 @@ const handleUpdateAttendance = async (req, res) => {
       res
         .status(500)
         .json({ message: "Server error. Please try again later.", key: 0 });
-    }
+    } 
   } else {
     try {
       // Find the user by email
@@ -695,6 +700,31 @@ const calculateAccuracy = (totalTests, isCorrectPrediction, previousAccuracy) =>
   return correctPredictions / (totalTests + 1);
 };
 
+const streamAttendanceToStudents = async (req, res) => {
+  const { usns, note } = req.body;
+
+  if (!Array.isArray(usns)) {
+    return res.status(400).json({ error: 'Invalid input. Expected an array of USNs.' });
+  }
+
+  try {
+    // Mark the provided USNs as present
+    const updates = usns.map((usn) =>
+      StreamPredictedAttendance.findOneAndUpdate(
+        { usn},
+        { $set: { present: true, note } },
+        { upsert: true, new: true }
+      )
+    );
+
+    await Promise.all(updates);
+
+    res.status(200).json({ message: 'Attendance marked successfully.', key:1 });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'An error occurred while marking attendance.' });
+  }
+};
 
 module.exports = {
   userSignup,
@@ -711,5 +741,6 @@ module.exports = {
   handleViewStudentAttendance,
   handleAdminAddFaculty,
   handleFetchFacultyForAdmin,
-  storeAccuracyLevels
+  storeAccuracyLevels,
+  streamAttendanceToStudents,
 };
